@@ -88,24 +88,30 @@ def get_note(call):
         group_categories(user, categories)
 
 
+def category_exist_error(call):
+    bot.answer_callback_query(call.id, 'You have not select category')
+    bot.delete_message(user, call.message.message_id)
+    group_categories(user, get_all_categories(user))
+
+
+def send_notes(notes, user, message_id):
+    markup = InlineKeyboardMarkup()
+    states.set_state(user, 'notes')
+    for note in notes:
+        btn = InlineKeyboardButton(text=note, callback_data=note)
+        markup.add(btn)
+    bot.edit_message_text('Notes:', user, message_id, reply_markup=markup)
+
+
 def group_notes(call):
     user = call.from_user.id
-    markup = InlineKeyboardMarkup()
     category = states.get_extra_state(user, 'category')
-    if category:
-        notes = by_category(user, category)
-        if notes:
-            states.set_state(user, 'notes')
-            for note in notes:
-                btn = InlineKeyboardButton(text=note, callback_data=note)
-                markup.add(btn)
-            bot.edit_message_text('Notes:', user, call.message.message_id, reply_markup=markup)
-        else:
-            bot.answer_callback_query(call.id, 'You have not any notes')
-    else:
-        bot.answer_callback_query(call.id, 'You have not select category')
-        bot.delete_message(user, call.message.message_id)
-        group_categories(user, get_all_categories(user))
+    if not category:
+        return category_exist_error(call)
+    notes = by_category(user, category)
+    if not notes:
+        return bot.answer_callback_query(call.id, 'You have not any notes')
+    return send_notes(notes, user, call.message.message_id)
 
 
 @bot.callback_query_handler(lambda call: call.data == 'show')
