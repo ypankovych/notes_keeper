@@ -56,9 +56,12 @@ def get_post(title, category_name, user_id):
     return note.first()
 
 
-def change_category(title, category_name, user_id, new):
-    post = get_post(title, category_name, user_id)
+def change_category(note, user_id, new):
     user = get_user(user_id)
     new_category = get_category(user, new)
-    post.category = new_category
-    post.save()
+    note.category = new_category
+    note.save()
+
+
+def delete_post(note):
+    note.delete_instance()

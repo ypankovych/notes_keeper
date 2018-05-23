@@ -4,7 +4,7 @@ from fsm import FSM
 from templates import note_temp
 from telebot.types import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 
-bot = telebot.TeleBot('')
+bot = telebot.TeleBot('445020523:AAHaB9p_fvz_OC38xR7WzrtIXvrlc4bV_7M')
 states = FSM(default='create')
 
 
@@ -76,16 +76,54 @@ def create_notes(call):
 def get_note(call):
     user = call.from_user.id
     category = states.get_extra_state(user, 'category')
-    if category:
-        note = get_post(call.data, category, user)
+    if not category:
+        return select_category(user, call)
+    markup = InlineKeyboardMarkup()
+    delete_note_brn = InlineKeyboardButton(text='Delete', callback_data='delete_note')
+    change_category_btn = InlineKeyboardButton(text='Change category', callback_data='change_c')
+    markup.add(delete_note_brn, change_category_btn)
+    note = get_post(call.data, category, user)
+    if note:
+        states.remove_state(user)
+        states.add_extra_state(user, 'note', note)
         bot.edit_message_text(text=note_temp.format(note.title, note.content),
                               chat_id=user, message_id=call.message.message_id,
-                              parse_mode='Markdown')
-    else:
-        categories = get_all_categories(user)
-        bot.answer_callback_query(call.id, 'Select category')
-        bot.delete_message(chat_id=user, message_id=call.message.message_id)
-        group_categories(user, categories)
+                              parse_mode='Markdown', reply_markup=markup)
+
+
+@bot.callback_query_handler(lambda call: call.data == 'delete_note')
+def delete_note(call):
+    note = states.get_extra_state(call.from_user.id, 'note')
+    if note:
+        delete_post(note)
+        bot.answer_callback_query(text='Done', callback_query_id=call.id)
+        category_settings(call)
+
+
+@bot.callback_query_handler(lambda call: call.data == 'change_c')
+def change_note_category(call):
+    categories = get_all_categories(call.from_user.id)
+    note = states.get_extra_state(call.from_user.id, 'note')
+    if note:
+        states.set_state(call.from_user.id, 'change')
+        group_categories(call.from_user.id, categories, True, call.message.message_id)
+
+
+@bot.callback_query_handler(lambda call: states.get_state(call.from_user.id) == 'change')
+def change(call):
+    states.remove_state(call.from_user.id)
+    note = states.get_extra_state(call.from_user.id, 'note')
+    if note:
+        change_category(note, call.from_user.id, call.data)
+        bot.answer_callback_query(call.id, 'Done')
+        category_settings(call)
+
+
+def select_category(user, call):
+    categories = get_all_categories(user)
+    bot.answer_callback_query(call.id, 'Select category')
+    bot.delete_message(chat_id=user, message_id=call.message.message_id)
+    group_categories(user, categories)
 
 
 def category_exist_error(call):
@@ -147,16 +185,21 @@ def cancel(call):
 
 @bot.callback_query_handler(lambda call: states.get_state(call.from_user.id) == 'category')
 def manage_category(call):
-    states.add_extra_state(call.from_user.id, 'category', call.data)
-    category_settings(call)
+    categories = get_all_categories(call.from_user.id)
+    if call.data in categories:
+        states.add_extra_state(call.from_user.id, 'category', call.data)
+        category_settings(call)
 
 
-def group_categories(user_id, categories):
+def group_categories(user_id, categories, edit=False, msg_id=None):
     markup = InlineKeyboardMarkup()
     for category in categories:
         button = InlineKeyboardButton(text=category, callback_data=category)
         markup.add(button)
-    bot.send_message(chat_id=user_id, text='Select category', reply_markup=markup)
+    if not edit:
+        bot.send_message(chat_id=user_id, text='Select category', reply_markup=markup)
+    else:
+        bot.edit_message_text(chat_id=user_id, message_id=msg_id, text='Select category', reply_markup=markup)
 
 
 def create_cancel_button(callback='cancel'):
@@ -167,5 +210,4 @@ def create_cancel_button(callback='cancel'):
 
 
 if __name__ == '__main__':
-    bot.skip_pending = True
     bot.polling(none_stop=True)
