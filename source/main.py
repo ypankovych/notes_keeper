@@ -4,7 +4,7 @@ from fsm import FSM
 from templates import note_temp
 from telebot.types import ReplyKeyboardMarkup, InlineKeyboardButton, InlineKeyboardMarkup
 
-bot = telebot.TeleBot('445020523:AAHaB9p_fvz_OC38xR7WzrtIXvrlc4bV_7M')
+bot = telebot.TeleBot('<token>')
 states = FSM(default='create')
 
 
